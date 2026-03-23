@@ -19,6 +19,10 @@ project("mini_serv" VERSION 0.1.0 LANGUAGES C CXX ASM ASM_NASM)
 set(CMAKE_C_STANDARD 11)
 
 set(TARGET_EXE_NAME "${PROJECT_NAME}")
+
+set(PROJECT_CFLAGS -g3 -O0 -mmanual-endbr)
+set(NASM_FLAGS -f elf64 -g -F dwarf -Wall -w-reloc-rel-dword)
+
 set(TARGET_CFLAGS ${PROJECT_CFLAGS})
 set(TARGET_ASM_FLAGS ${NASM_FLAGS})
 
@@ -42,7 +46,7 @@ target_link_options(${TARGET_EXE_NAME}
         -gdwarf-3
         -nostartfiles
 )
-set(NASM_FLAGS -f elf64 -g -F dwarf -Wall)
+
 target_compile_options(${TARGET_EXE_NAME}
         PRIVATE
         $<$<COMPILE_LANGUAGE:ASM_NASM>:

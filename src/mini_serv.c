@@ -10,6 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
+#define _GNU_SOURCE         /* See feature_test_macros(7) */
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -34,11 +35,7 @@ fd_set	read_fds;
 char buf_send[1000001];
 char buf_read[1000001];
 
-void fatal_error() {
-	char *err = "Fatal error\n";
-	write(STDERR_FILENO, err, strlen(err));
-	exit(EXIT_FAILURE);
-}
+void fatal_error();
 
 void send_all(int sender_fd, int sockfd, char *msg) {
 	for (int fd = 0; fd <= max_fd; fd++) {
@@ -65,29 +62,49 @@ char	*str_join(char *buf, char *add) {
 	return (new_buf);
 }
 
-int	extract_message(char **buf, char **msg) {
-	char	*new_buf;
-	int		i;
+#define STR1(x) #x
+#define STR(x) STR1(x)
+#define ASM_DBG_LABEL(name) \
+    asm volatile( \
+        ".loc 1 " STR(__LINE__) " 0\n\t" \
+        ".globl " #name "\n\t"         \
+        ".hidden " #name "\n\t" \
+        #name ":\n\t" \
+        : : : "memory")
+#define ASM_L(name) ASM_DBG_LABEL(name)
 
-	*msg = 0;
-	if (*buf == 0)
-		return (0);
-	i = 0;
-	while ((*buf)[i]) {
-		if ((*buf)[i] == '\n') {
-			new_buf = calloc(1, sizeof(*new_buf) * (strlen(*buf + i + 1) + 1));
-			if (new_buf == 0)
-				return (-1);
-			strcpy(new_buf, *buf + i + 1);
-			*msg = *buf;
-			(*msg)[i + 1] = 0;
-			*buf = new_buf;
-			return (1);
-		}
-		i++;
-	}
-	return (0);
+int	extract_message(char **bufferPointer, char **msg);
+/*
+int	extract_message(char **bufferPointer, char **msg)
+{
+	char *buf = *bufferPointer;
+	char *new_line = NULL;
+	char *src = NULL;
+	char *new_buf = NULL;
+
+	*msg = NULL;
+	if (buf == NULL)
+		goto ret0;
+	new_line = strchrnul(buf, '\n');
+	if (*new_line == '\0')
+		goto ret0;
+
+	src = new_line + 1;
+	new_buf = calloc(1, strlen(src) + 1);
+	if (new_buf == NULL)
+		goto retneg1;
+
+	strcpy(new_buf, src);
+	*msg = buf;
+	*src = '\0';
+	*bufferPointer = new_buf;
+	return 1;
+ret0:
+	return 0;
+retneg1:
+	return -1;
 }
+*/
 
 int main(int argc, char *argv[]) {
 
