@@ -20,7 +20,12 @@ set(CMAKE_C_STANDARD 11)
 
 set(TARGET_EXE_NAME "${PROJECT_NAME}")
 
-set(PROJECT_CFLAGS -g3 -O0 -mmanual-endbr)
+set(PROJECT_CFLAGS
+        -g3 -O0
+        -mmanual-endbr
+        -fno-verbose-asm
+        -fno-omit-frame-pointer
+)
 set(NASM_FLAGS -f elf64 -g -F dwarf -Wall -w-reloc-rel-dword)
 
 set(TARGET_CFLAGS ${PROJECT_CFLAGS})

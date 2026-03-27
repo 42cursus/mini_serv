@@ -1,3 +1,33 @@
+;int	extract_message(char **bufferPointer, char **msg)
+;{
+;	char *buf = *bufferPointer;
+;	char *new_line = NULL;
+;	char *src = NULL;
+;	char *new_buf = NULL;
+;
+;	*msg = NULL;
+;	if (buf == NULL)
+;		goto ret0;
+;	new_line = strchrnul(buf, '\n');
+;	if (*new_line == '\0')
+;		goto ret0;
+;
+;	src = new_line + 1;
+;	new_buf = calloc(1, strlen(src) + 1);
+;	if (new_buf == NULL)
+;		goto retneg1;
+;
+;	strcpy(new_buf, src);
+;	*msg = buf;
+;	*src = '\0';
+;	*bufferPointer = new_buf;
+;	return 1;
+;ret0:
+;	return 0;
+;retneg1:
+;	return -1;
+;}
+
 bits 64
 default rel
 

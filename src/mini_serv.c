@@ -35,13 +35,81 @@ fd_set	read_fds;
 char buf_send[1000001];
 char buf_read[1000001];
 
-void fatal_error();
+void	fatal_error();
+void	send_all(int sender_fd, int sockfd, char *msg);
+int		extract_message(char **bufferPointer, char **msg);
 
-void send_all(int sender_fd, int sockfd, char *msg) {
+/*
+#define STR1(x) #x
+#define STR(x) STR1(x)
+#define ASM_DBG_LABEL(name) \
+    asm volatile( \
+        ".loc 1 " STR(__LINE__) " 0\n\t" \
+        ".globl " #name "\n\t"         \
+        ".hidden " #name "\n\t" \
+        #name ":\n\t" \
+        : : : "memory")
+#define ASM_L(name) ASM_DBG_LABEL(name)
+
+void send_all2(int sender_fd, int sockfd, char *msg)
+{
+	__fd_mask *fds_bits = master_fds.fds_bits;
+
 	for (int fd = 0; fd <= max_fd; fd++) {
-		if (FD_ISSET(fd, &master_fds) && fd != sender_fd && fd != sockfd)
+		volatile unsigned int i = __NFDBITS;
+		unsigned int rem = (fd) % i;
+		__fd_mask mask = (__fd_mask) (1UL << rem);
+		int idx = (fd) / i;
+		__fd_mask bits = fds_bits[idx];
+		register _Bool is_set = (bits & mask) != 0;
+		register _Bool hit = is_set & (fd != sender_fd) & (fd != sockfd);
+		if (hit)
 			send(fd, msg, strlen(msg), 0);
 	}
+}
+
+
+void send_all3(int sender_fd, int sockfd, char *msg) {
+	__fd_mask *fds_bits = NULL;
+	size_t msg_len = 0;
+
+	register size_t msg_len_r = strlen(msg);
+
+	msg_len = msg_len_r;
+	fds_bits = master_fds.fds_bits;
+
+	// Enter a loop for processing sending messages
+	register int fd = 0;
+
+
+	goto loop_iter;
+loop_start:
+	ASM_L(send_loop_start);
+
+	register unsigned int i = __NFDBITS;
+
+	register unsigned int idx = (fd) / i;
+
+	unsigned int i1 = (fd) % i;
+	register __fd_mask i2 = fds_bits[idx];
+	register __fd_mask mask = (__fd_mask) (1UL << i1);
+
+	register _Bool is_set = (i2 & mask) != 0;
+//	register _Bool is_set = (fds_bits[(fd) / i] & mask) != 0;
+//	register _Bool is_set = (master_fds.fds_bits[idx] & mask) != 0;
+
+//	register _Bool is_set = FD_ISSET(fd, &master_fds);
+
+	register _Bool hit = is_set & (fd != sender_fd) & (fd != sockfd);
+	if (hit)
+		send(fd, msg, msg_len, 0);
+
+	fd++;
+	ASM_L(send_loop_iter);
+loop_iter:
+	if (fd <= max_fd)
+		goto loop_start;
+	ASM_L(send_loop_end);
 }
 
 char	*str_join(char *buf, char *add) {
@@ -61,50 +129,9 @@ char	*str_join(char *buf, char *add) {
 	strcat(new_buf, add);
 	return (new_buf);
 }
-
-#define STR1(x) #x
-#define STR(x) STR1(x)
-#define ASM_DBG_LABEL(name) \
-    asm volatile( \
-        ".loc 1 " STR(__LINE__) " 0\n\t" \
-        ".globl " #name "\n\t"         \
-        ".hidden " #name "\n\t" \
-        #name ":\n\t" \
-        : : : "memory")
-#define ASM_L(name) ASM_DBG_LABEL(name)
-
-int	extract_message(char **bufferPointer, char **msg);
-/*
-int	extract_message(char **bufferPointer, char **msg)
-{
-	char *buf = *bufferPointer;
-	char *new_line = NULL;
-	char *src = NULL;
-	char *new_buf = NULL;
-
-	*msg = NULL;
-	if (buf == NULL)
-		goto ret0;
-	new_line = strchrnul(buf, '\n');
-	if (*new_line == '\0')
-		goto ret0;
-
-	src = new_line + 1;
-	new_buf = calloc(1, strlen(src) + 1);
-	if (new_buf == NULL)
-		goto retneg1;
-
-	strcpy(new_buf, src);
-	*msg = buf;
-	*src = '\0';
-	*bufferPointer = new_buf;
-	return 1;
-ret0:
-	return 0;
-retneg1:
-	return -1;
-}
 */
+
+
 
 int main(int argc, char *argv[]) {
 
