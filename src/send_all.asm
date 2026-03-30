@@ -16,8 +16,9 @@ default rel
 %define sender_fd          dword[rbp - 36] ; DWORD PTR -36[rbp]
 %define sockfd             dword[rbp - 40] ; DWORD PTR -40[rbp]
 %define msg                qword[rbp - 48] ; QWORD PTR -48[rbp]
+%define fd                 ebx ;
 
-%define __NFDBITS          64 ; QWORD PTR -48[rbp]
+%define __NFDBITS          64 ; 
 
 SECTION .data			  ; Section containing initialized data
 SECTION .rodata			  ; Section containing initialized read-only data
@@ -34,7 +35,7 @@ extern send
 
 global   send_all
 global   loop_start:hidden
-global   loop_iter:hidden
+global   loop_fd:hidden
 global   loop_end:hidden
 
 send_all:
@@ -56,7 +57,7 @@ send_all:
 	call strlen wrt ..plt  ; Call libc function
 	mov	msg_len, rax
 
-	mov	ebx, 0
+	mov	fd, 0
 	jmp loop_iter;
 loop_start:
 
@@ -64,13 +65,13 @@ loop_start:
 	mov	r12d, __NFDBITS     ; __NFDBITS = 64
 
 	; r10d = (fd / __NFDBITS);
-	mov	eax, ebx
+	mov	eax, fd
 	mov	edx, 0
 	div	r12d
 	mov	r10d, eax
 
 	; r11d = (fd % __NFDBITS)
-	mov	eax, ebx
+	mov	eax, fd
 	mov	edx, 0
 	div	r12d
 	mov	r11d, edx
@@ -95,16 +96,16 @@ loop_start:
 
 	; Inputs:
 	;   r12b = is_set, assumed 0 or 1
-	;   ebx  = fd
+	;   fd  = fd
 	;   [sender_fd]
 	;   [sockfd]
 	;
 	; Output:
 	;   r12b = hit, 0 or 1
-	cmp     ebx, sender_fd
+	cmp     fd, sender_fd
 	setne   al
 
-	cmp     ebx, sockfd
+	cmp     fd, sockfd
 	setne   dl
 
 	and     al, dl
@@ -119,15 +120,15 @@ loop_start:
 	mov     ecx, 0         ; flags = 0
 	mov     rdx, msg_len   ; size_t len
 	mov     rsi, msg       ; const void *buf
-	mov     edi, ebx       ; int fd
+	mov     edi, fd        ; int fd
 
 	call send wrt ..plt  ; Call libc function
 
 .L4:
-	add	ebx, 1
+	add	fd, 1
 loop_iter:
 	mov	eax, [rel max_fd]
-	cmp	ebx, eax
+	cmp	fd, eax
 	jle	loop_start
 loop_end:
 	nop

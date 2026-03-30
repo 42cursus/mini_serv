@@ -22,7 +22,11 @@ set(TARGET_EXE_NAME "${PROJECT_NAME}")
 
 set(PROJECT_CFLAGS
         -g3 -O0
+        -fif-conversion
+        -fif-conversion2
         -mmanual-endbr
+        -fno-stack-protector
+#        -fno-stack-protector-all
         -fno-verbose-asm
         -fno-omit-frame-pointer
 )

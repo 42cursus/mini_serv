@@ -15,20 +15,18 @@ default rel
 
 SECTION .rodata			; Section containing initialized data
 
-ErrMsg: db `Fatal error\n`
-ErrLen: equ $-ErrMsg
+err_msg: db `Fatal error\n`, 0
+err_len: equ ($ - err_msg) - 1
 
 SECTION .bss				; Section containing uninitialized data
-
 SECTION .text				; Section containing code
-
 
 global   fatal_error
 fatal_error:
 	mov rax,sys_write     ; 1 = sys_write for syscall
-	mov rdi,STDERR_FILENO ; 1 = fd for stderr; write to the terminal window
-	lea rsi,[ErrMsg]      ; Put address of the message string in rsi
-	mov rdx,ErrLen        ; Length of string to be written in rdx
+	mov rdi,STDERR_FILENO ; 2 = fd for stderr; write to the terminal window
+	lea rsi,[rel err_msg] ; Put address of the message string in rsi
+	mov rdx,err_len       ; Length of string to be written in rdx
 	syscall               ; Make the system call
 
 	mov rax,sys_exit      ; 60 = exit the program

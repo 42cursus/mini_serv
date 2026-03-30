@@ -111,28 +111,29 @@ loop_iter:
 		goto loop_start;
 	ASM_L(send_loop_end);
 }
+*/
+
+char	*str_join(char *buf, char *add);
+
+/*
+__attribute__((noinline,optimize("-O0")))
+static void escape(void *p) { asm volatile("" : : "g"(p) : "memory"); }
+
 
 char	*str_join(char *buf, char *add) {
-	char	*new_buf;
-	int		len;
-
-	len = 0;
-	if (buf != NULL)
-		len = strlen(buf);
-	new_buf = malloc((len + strlen(add) + 1) * sizeof(char));
-	if (new_buf == NULL)
-		return (NULL);
+	const char *p = buf ? buf : "";
+	size_t len = strlen(p);
+	char *new_buf = malloc((len + strlen(add) + 1) * sizeof(char));
+	escape(&new_buf);
+	if (new_buf != NULL) goto result;
 	new_buf[0] = '\0';
-	if (buf != NULL)
-		strcat(new_buf, buf);
+	strcat(new_buf, p);
 	free(buf);
 	strcat(new_buf, add);
+result:
 	return (new_buf);
 }
 */
-
-
-
 int main(int argc, char *argv[]) {
 
 	if (argc != 2) {
