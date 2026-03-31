@@ -19,10 +19,11 @@
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <arpa/inet.h>
 
 
 typedef struct s_client {
-	size_t	id;
+	int	id;
 	char	*msg;
 }	t_client;
 
@@ -74,6 +75,7 @@ static void escape(void *p) {
 
 }
 
+/*
 void handle_leave(int sockfd, int fd) {
 	sprintf(buf_send, "server: client %d just left\n", clients[fd].id);
 	send_all(fd, sockfd, buf_send);
@@ -81,17 +83,20 @@ void handle_leave(int sockfd, int fd) {
 	FD_CLR(fd, &master_fds);
 	close(fd);
 
-	if (clients[fd].msg)
+	if (clients[fd].msg == NULL) goto clear;
 		free(clients[fd].msg);
+clear:
 	clients[fd].msg = NULL;
 }
+*/
+
 
 void handle_read(int sockfd, int fd, int bytes) {
 	buf_read[bytes] = 0;
-	char *client_buff = clients[fd].msg;
-	client_buff = str_join(client_buff, buf_read);
+	clients[fd].msg = str_join(clients[fd].msg, buf_read);
+
 	char *msg_to_send = NULL;
-	while (extract_message(&client_buff, &msg_to_send) != 0) {
+	while (extract_message(&clients[fd].msg, &msg_to_send) != 0) {
 
 		sprintf(buf_send, "client %d: %s", clients[fd].id, msg_to_send);
 		send_all(fd, sockfd, buf_send);
@@ -112,6 +117,11 @@ int main(int argc, char *argv[]) {
 	if (sockfd < 0)
 		fatal_error();
 
+	int reuse = 1;
+	int result = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse, sizeof(reuse));
+	if (result < 0)
+		fatal_error();
+
 	max_fd = sockfd;
 	FD_ZERO(&master_fds);
 	FD_SET(sockfd, &master_fds);
@@ -119,7 +129,9 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in addr;
 	bzero(&addr, sizeof(addr));
 	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = htonl(2130706433); // 127.0.0.1
+	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // 127.0.0.1; 2130706433
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	inet_pton(addr.sin_family, "127.0.0.1", &addr.sin_addr);
 	addr.sin_port = htons(atoi(argv[1]));
 
 	if (bind(sockfd, (const struct sockaddr *) &addr, sizeof(addr)) < 0)
@@ -129,7 +141,8 @@ int main(int argc, char *argv[]) {
 
 	while (1) {
 		read_fds = master_fds;
-		if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) >= 0) {
+		int  fd_num = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
+		if (fd_num >= 0) {
 			for (int fd = 0; fd <= max_fd; fd++) {
 				if (FD_ISSET(fd, &read_fds)) {
 					if (fd == sockfd)

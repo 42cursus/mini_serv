@@ -12,7 +12,7 @@ default rel
 SECTION .data			  ; Section containing initialized data
 SECTION .rodata			  ; Section containing initialized read-only data
 
-SECTION .rodata.str1.1 progbits alloc noexec nowrite align=1 merge strings
+;SECTION .rodata.str1.1 progbits alloc noexec nowrite align=1 merge strings
 LC0: db "", 0
 
 SECTION .bss              ; Section containing uninitialized data

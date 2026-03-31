@@ -22,11 +22,11 @@ set(TARGET_EXE_NAME "${PROJECT_NAME}")
 
 set(PROJECT_CFLAGS
         -g3 -O0
+        -Wa,-L
         -fif-conversion
         -fif-conversion2
         -mmanual-endbr
         -fno-stack-protector
-#        -fno-stack-protector-all
         -fno-verbose-asm
         -fno-omit-frame-pointer
 )
@@ -50,7 +50,6 @@ target_link_options(${TARGET_EXE_NAME} PRIVATE)
 target_link_options(${TARGET_EXE_NAME}
         PRIVATE
         -O0 -g3
-        -Wa,-L
         -fno-omit-frame-pointer
         -gdwarf-3
         -nostartfiles
