@@ -18,7 +18,7 @@ default rel
 %define msg                qword[rbp - 48] ; QWORD PTR -48[rbp]
 %define fd                 ebx ;
 
-%define __NFDBITS          64 ; 
+%define NFDBITS          64 ;
 
 SECTION .data			  ; Section containing initialized data
 SECTION .rodata			  ; Section containing initialized read-only data
@@ -61,16 +61,16 @@ send_all:
 	jmp loop_iter;
 loop_start:
 
-	; register unsigned int i = __NFDBITS;
-	mov	r12d, __NFDBITS     ; __NFDBITS = 64
+	; register unsigned int i = NFDBITS;
+	mov	r12d, NFDBITS     ; NFDBITS = 64
 
-	; r10d = (fd / __NFDBITS);
+	; r10d = (fd / NFDBITS);
 	mov	eax, fd
 	mov	edx, 0
 	div	r12d
 	mov	r10d, eax
 
-	; r11d = (fd % __NFDBITS)
+	; r11d = (fd % NFDBITS)
 	mov	eax, fd
 	mov	edx, 0
 	div	r12d
