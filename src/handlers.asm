@@ -41,52 +41,78 @@ handle_leave:
 	push	r13
 	push	r12
 	push	rbx
-	mov	r13d, edi
-	mov	ebx, esi
 
-	; sprintf(buf_send, "server: client %d just left\n", clients[fd].id);
-	movsx	rax, esi
-	sal	rax, 4
-	lea	r12, [rel clients]
-	add	r12, rax
-	mov	rdx, qword [r12]
-	lea	rsi, [rel LC2]
+	; save arguments
+	mov	r13d, edi				; int sockfd
+	mov	ebx, esi				; int fd
+
+	; -- sprintf(buf_send, "server: client %d just left\n", clients[fd].id); --
+	; 	size_t offset = fd * sizeof(clients[0]);
+	; same as:
+	; 	size_t offset = (int64_t)fd << __builtin_ctz(sizeof(clients[0]));
+	movsx	r12, esi			; r12 = (int64_t)fd // signed extend
+	sal	r12, 4					; r12 = r12 * 16	// mul via shift arifmetic left by log2(sizeof(t_client))
+
+	; int id = *(int *)((char *)clients + offset);
+	lea	rax, [rel clients]
+	add r12, rax 				; r12 holds the pointer &clients[fd]
+	mov	edx, dword [r12 + 0]	; `id` is at offset 0 inside the `t_client` struct
+
+	; const char *string = "server: client %d just left\n";
+	lea	rax, [rel LC2]
+
+	mov	rsi, rax				; format string
+
+	; char *bufSend = *(&buf_send[0]);
 	lea	r14, [rel buf_send]
-	mov	rdi, r14
-	mov	eax, 0
+
+	mov	rdi, r14				; buffer
+
+	mov	eax, 0					; al = number of vector registers (XMM) used to pass floating-point arguments
 	call	sprintf wrt ..plt
 
 	; send_all(fd, sockfd, buf_send);
-	mov	rdx, r14
-	mov	esi, r13d
-	mov	edi, ebx
+	mov	rdx, r14	; buf_send
+	mov	esi, r13d	; int sockfd
+	mov	edi, ebx	; int fd
 	call	send_all wrt ..plt
 
-	; FD_CLR(fd, &master_fds);
-	lea	eax, [rbx + 63]
-	test	ebx, ebx
-	cmovns	eax, ebx
-	sar	eax, 6
-	mov	edx, 1
+	; -- FD_CLR(fd, &master_fds); --
+	; same as `(void) (master_fds.fds_bits[__FD_ELT(fd)] &= ~__FD_MASK(fd));`
+
+	; unsigned irem = (unsigned)fd % NFDBITS; same as: (unsigned)fd & (NFDBITS - 1);
+	; ensures irem < 64
 	mov	ecx, ebx
-	sal	rdx, cl
-	not	rdx
+	and	ecx, 63					; (unsigned)fd & (NFDBITS - 1);
+
+	; __fd_mask mask = (__fd_mask) (1UL << irem);
+	mov	edx, 1					; 1UL
+	sal	rdx, cl					; rdx <<= cl; (cl is the low 8 bits of $rcx)
+
+	; __fd_mask *fds_bits = master_fds.fds_bits;
 	lea	rcx, [rel master_fds]
-	cdqe
+
+	; unsigned iquot = (unsigned)fd / NFDBITS; == (unsigned)fd >> __builtin_ctz(NFDBITS);
+	mov	eax, ebx				; eax = fd
+	shr	eax, 6					; eax = eax >> log2(NFDBITS)
+
+	; (void)(fds_bits[iquot] &= ~mask);
+	mov	eax, eax				; zero-extend EAX into RAX for 64-bit indexed addressing (like movzx rax, eax)
+	not	rdx						; ~mask
 	and	qword [rcx+rax*8], rdx
 
 	; close(fd);
 	mov	edi, ebx
 	call	close wrt ..plt
 
-	; if (clients[fd].msg) goto clear;
-	mov	rdi, qword [r12 + 8]
+	; if (clients[fd].msg == NULL) goto clear;
+	mov	rdi, qword [r12 + 8]	; `msg` is at offset 8 inside the `t_client` struct
 	test	rdi, rdi
 	je	clear
 	call	free wrt ..plt
 clear:
 	;clients[fd].msg = NULL;
-	movsx	rbx, ebx
+	movsx	rbx, ebx			; sign-extend 32-bit fd into 64-bit rbx
 	sal	rbx, 4
 	lea	rax, [rel clients]
 	mov	qword [rax + rbx + 8], NULL

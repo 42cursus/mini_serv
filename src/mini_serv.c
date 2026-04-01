@@ -77,7 +77,8 @@ static void escape(void *p) {
 
 /*
 void handle_leave(int sockfd, int fd) {
-	sprintf(buf_send, "server: client %d just left\n", clients[fd].id);
+	const char *string = "server: client %d just left\n";
+	__builtin_sprintf(buf_send, string, clients[fd].id);
 	send_all(fd, sockfd, buf_send);
 
 	FD_CLR(fd, &master_fds);
