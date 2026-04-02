@@ -15,12 +15,14 @@ SECTION .rodata			  ; Section containing initialized read-only data
 
 LC1: db `server: client %d just arrived\n`,0
 LC2: db `server: client %d just left\n`,0
+LC3: db `client %d: %s`,0
 
 SECTION .bss              ; Section containing uninitialized data
 
 extern max_fd
 extern clients
 extern buf_send
+extern buf_read
 extern master_fds
 
 SECTION .text			  ; Section containing code
@@ -29,11 +31,123 @@ extern sprintf
 extern accept
 extern close
 extern free
+extern str_join
 extern send_all
+extern extract_message
 
 global   try_accept
 global   handle_leave
+global   handle_read
 
+; --- X86_64 SysV ABI ---
+; https://wiki.osdev.org/System_V_ABI
+; The first six integer and pointer arguments are passed like this:
+;	arg1: rdi
+;	arg2: rsi
+;	arg3: rdx
+;	arg4: rcx
+;	arg5: r8
+;	arg6: r9
+
+; void handle_read(int sockfd, int fd, int bytes)
+handle_read:
+	push	rbp
+	mov	rbp, rsp
+	push	r15
+	push	r14
+	push	r13
+	push	r12
+	push	rbx
+	sub	rsp, 24
+
+	%define msg_to_send_off			56 ;
+	%define t_client_id_off			0 ; client->id
+	%define t_client_msg_off		8 ; client->msg
+	%define msg_to_send_slot		[rbp - msg_to_send_off] ; QWORD PTR -56[rbp]
+	%define msg_to_send				qword[rbp - 56] ; QWORD PTR -56[rbp]
+
+	; save arguments
+	mov	r13d, edi					; sockfd
+	mov	r12d, esi					; fd
+	mov	edx, edx					; bytes
+
+	; char *msg_to_send = NULL;
+	mov	msg_to_send, 0
+
+	; int id = clients[fd].id;
+	movsx	rax, r12d				; rax = (int64_t)fd (signed extend)
+	sal	rax, 4						; rax = fd * sizeof(t_client) == (int64_t)fd << __builtin_ctz(sizeof(t_client))
+	lea	rbx, [rel clients]
+	add	rbx, rax					; rbx = &clients[fd]
+	mov	r15d, dword [rbx + t_client_id_off]		; r15d = client->id
+
+	; char **msg = &clients[fd].msg;
+	lea	r14, [rbx + t_client_msg_off]				; r14 = &client->msg
+
+	; buf_read[bytes] = 0;
+	lea	rsi, [rel buf_read]
+	movsx	rdx, edx
+	mov	byte [rsi + rdx], 0
+
+	; *msg = str_join(*msg, buf_read);
+	mov	rsi, rsi					; rsi = buf_read
+	mov	rdi, qword [r14]			; rdi = *msg
+	call	str_join wrt ..plt
+	mov	qword [r14], rax
+
+L1_loop_start:
+	; int extractResult = extract_message(msg, &msg_to_send);
+	lea	rsi, msg_to_send_slot		; rsi = msg_to_send
+	mov	rdi, r14					; rdi = msg
+	call	extract_message wrt ..plt
+	jmp	L1_loop_iter
+L1_loop_body:
+	; const char *format = "client %d: %s";
+	lea	rsi, [rel LC3]
+
+	; char *bufSend = &buf_send[0];
+	lea	rbx, [rel buf_send]
+
+	; sprintf(bufSend, format, id, msg_to_send);
+	mov	rcx, msg_to_send			; msg_to_send
+	mov	edx, r15d					; id
+	mov	rsi, rsi					; format
+	mov	rdi, rbx					; bufSend
+	mov	eax, 0
+	call	sprintf wrt ..plt
+
+	; send_all(fd, sockfd, bufSend);
+	mov	rdx, rbx					; rdx = bufSend
+	mov	esi, r13d					; esi = sockfd
+	mov	edi, r12d					; edi = fd
+	call	send_all wrt ..plt
+
+	; free(msg_to_send);
+	mov	rdi, msg_to_send
+	call	free wrt ..plt
+
+	; msg_to_send = NULL;
+	mov	msg_to_send, 0
+
+	; extractResult = extract_message(msg, &msg_to_send);
+	lea	rsi, msg_to_send_slot
+	mov	rdi, r14
+	call	extract_message wrt ..plt
+L1_loop_iter:
+	test	eax, eax
+	jne	L1_loop_body
+
+L1_loop_end:
+	add	rsp, 24
+	pop	rbx
+	pop	r12
+	pop	r13
+	pop	r14
+	pop	r15
+	pop	rbp
+	ret
+
+;void	handle_leave(int sockfd, int fd);
 handle_leave:
 	push	rbp
 	mov	rbp, rsp
@@ -124,6 +238,7 @@ clear:
 	pop	rbp
 	ret
 
+; void	try_accept(int sockfd);
 try_accept:
 	push	rbp
 	mov	rbp, rsp

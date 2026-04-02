@@ -11,10 +11,12 @@
 # **************************************************************************** #
 
 cmake_minimum_required(VERSION 3.18)
+#set(CMAKE_C_COMPILER clang)
+set(CMAKE_C_COMPILER gcc)
 
 include_directories("include")
 
-project("mini_serv" VERSION 0.1.0 LANGUAGES C CXX ASM ASM_NASM)
+project("mini_serv" VERSION 0.1.0 LANGUAGES C ASM ASM_NASM)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -23,25 +25,37 @@ set(TARGET_EXE_NAME "${PROJECT_NAME}")
 set(PROJECT_CFLAGS
         -g3 -O0
         -Wa,-L
-        -fif-conversion
-        -fif-conversion2
-        -mmanual-endbr
+        -fcf-protection=none
         -fno-stack-protector
         -fno-verbose-asm
         -fno-omit-frame-pointer
 )
+
+IF(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    LIST(APPEND PROJECT_CFLAGS
+            -fif-conversion
+            -fif-conversion2
+            -mmanual-endbr
+    )
+ENDIF()
+
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
+    LIST(APPEND PROJECT_CFLAGS
+            -Wdocumentation
+    )
+ENDIF()
+
 set(NASM_FLAGS -f elf64 -g -F dwarf -Wall -w-reloc-rel-dword)
 
 set(TARGET_CFLAGS ${PROJECT_CFLAGS})
 set(TARGET_ASM_FLAGS ${NASM_FLAGS})
 
+set(TARGET_SOURCES)
 file(GLOB TARGET_HEADERS "src/*.h")
-set(GLOB TARGET_SOURCES)
+
 file(GLOB TARGET_ASM_SOURCES "src/*.asm")
 file(GLOB TARGET_C_SOURCES "src/*.c")
-file(GLOB TARGET_ASM2_SOURCES "src2/*.asm")
-file(GLOB TARGET_C2_SOURCES "src2/*.c")
-list(APPEND TARGET_SOURCES "${TARGET_ASM2_SOURCES};${TARGET_C2_SOURCES}")
+
 list(APPEND TARGET_SOURCES "${TARGET_ASM_SOURCES};${TARGET_C_SOURCES}")
 
 add_executable(${TARGET_EXE_NAME} ${TARGET_HEADERS} ${TARGET_SOURCES})

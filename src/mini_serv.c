@@ -45,6 +45,7 @@ int		extract_message(char **bufferPointer, char **msg);
 char	*str_join(char *buf, char *add);
 void	try_accept(int sockfd);
 void	handle_leave(int sockfd, int fd);
+void	handle_read(int sockfd, int fd, int bytes);
 
 /*
 __attribute__((noinline,optimize("-O0")))
@@ -91,21 +92,52 @@ clear:
 }
 */
 
+#define STR1(x) #x
+#define STR(x) STR1(x)
+#define ASM_DBG_LABEL(name) \
+    asm volatile( \
+        ".loc 1 " STR(__LINE__) " 0\n\t" \
+        ".globl " #name "\n\t"         \
+        ".hidden " #name "\n" \
+        #name ":\n\t" \
+        : : : "memory")
+#define ASM_L(name) ASM_DBG_LABEL(name)
 
-void handle_read(int sockfd, int fd, int bytes) {
-	buf_read[bytes] = 0;
-	clients[fd].msg = str_join(clients[fd].msg, buf_read);
+/* Force x to be materialized in a register here. Not a memory barrier. */
+#define MATERIALIZE_IN_REG(x) __asm__ volatile ("" : "+r"(x))
 
+/*
+void handle_read(int sockfd, int fd, int bytes)
+{
 	char *msg_to_send = NULL;
-	while (extract_message(&clients[fd].msg, &msg_to_send) != 0) {
+//	t_client *client = &clients[fd];
 
-		sprintf(buf_send, "client %d: %s", clients[fd].id, msg_to_send);
-		send_all(fd, sockfd, buf_send);
+//	escape(&client);
+	int id = clients[fd].id;
+	char **msg = &clients[fd].msg;
+	MATERIALIZE_IN_REG(bytes);
+	buf_read[bytes] = 0;
+
+	*msg = str_join(*msg, buf_read);
+	int extractResult = extract_message(msg, &msg_to_send);
+	ASM_L(loop_start);
+	while (extractResult != 0) {
+		ASM_L(loop_body);
+		const char *format = "client %d: %s";
+		MATERIALIZE_IN_REG(format);
+		char *bufSend = &buf_send[0];
+		MATERIALIZE_IN_REG(bufSend);
+		__builtin_sprintf(bufSend, format, id, msg_to_send);
+		send_all(fd, sockfd, bufSend);
 
 		free(msg_to_send);
 		msg_to_send = NULL;
+		extractResult = extract_message(msg, &msg_to_send);
+		ASM_L(loop_iter);
 	}
+	ASM_L(loop_end);
 }
+*/
 
 int main(int argc, char *argv[]) {
 

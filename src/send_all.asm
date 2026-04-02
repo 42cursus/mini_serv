@@ -38,6 +38,7 @@ global   loop_start:hidden
 global   loop_fd:hidden
 global   loop_end:hidden
 
+; void	send_all(int sender_fd, int sockfd, char *msg);
 send_all:
 	push	rbp
 	mov	rbp, rsp
@@ -57,9 +58,10 @@ send_all:
 	call strlen wrt ..plt  ; Call libc function
 	mov	msg_len, rax
 
-	mov	fd, 0
-	jmp loop_iter;
-loop_start:
+L2_loop_start:
+	mov	fd, -1
+	jmp L2_loop_iter;
+L2_loop_body:
 
 	; register unsigned int i = NFDBITS;
 	mov	r12d, NFDBITS     ; NFDBITS = 64
@@ -77,22 +79,22 @@ loop_start:
 	mov	r11d, edx
 
 	; mask = (__fd_mask) (1UL << r11d)
-	mov	eax, 1
-	mov	ecx, r11d
-	sal	rax, cl
-	mov	r12, rax
+	mov	ecx, r11d			;
+	mov	eax, 1				;
+	sal	rax, cl				;
+	mov	r12, rax			; r12 = (__fd_mask) (1UL << r11d)
 
 	; register _Bool is_set = (fds_bits[idx] & mask) != 0;
-	mov	eax, r10d
+	mov	eax, r10d			;
 	lea	rdx, 0[0+rax*8]
 	mov	rax, fds_bits_ptr
-	add	rax, rdx
-	mov	rax, qword [rax]
+	mov	rax, qword [rdx + rax]
 
-	mov	rax, rax
-	and	rax, r12
-	test	rax, rax
-	setne	r12b
+	mov	rax, rax			; zero-extend EAX into RAX for 64-bit indexed addressing (like movzx rax, eax)
+	and	rax, r12			; rax = (fds_bits[idx] & mask)
+
+	test	rax, rax		; rax = (fds_bits[idx] & mask) == 0
+	setne	r12b			; r12b = FD_ISSET(fd, &master_fds)
 
 	; Inputs:
 	;   r12b = is_set, assumed 0 or 1
@@ -103,34 +105,31 @@ loop_start:
 	; Output:
 	;   r12b = hit, 0 or 1
 	cmp     fd, sender_fd
-	setne   al
+	setne   al				; al = (fd != sender_fd)
 
 	cmp     fd, sockfd
-	setne   dl
+	setne   dl				; dl = (fd != sockfd)
 
-	and     al, dl
-	and     al, r12b
-	mov     r12b, al
+	and     al, dl			; al &= dl
+	and     r12b, al		; r12b = FD_ISSET(fd, &master_fds) && (fd != sockfd) && (fd != sender_fd)
 
 	; if (is_set)
 	test	r12b, r12b
-	je	.L4
+	je	L2_loop_iter
 
 	; -- send(fd, msg, msg_len, 0); --
-	mov     ecx, 0         ; flags = 0
-	mov     rdx, msg_len   ; size_t len
-	mov     rsi, msg       ; const void *buf
-	mov     edi, fd        ; int fd
-
-	call send wrt ..plt  ; Call libc function
-
-.L4:
+	mov     ecx, 0			; flags = 0
+	mov     rdx, msg_len	; size_t len
+	mov     rsi, msg		; const void *buf
+	mov     edi, fd			; edi = fd
+	call send wrt ..plt		; Call libc function
+L2_loop_iter:
 	add	fd, 1
-loop_iter:
 	mov	eax, [rel max_fd]
 	cmp	fd, eax
-	jle	loop_start
-loop_end:
+	jle	L2_loop_body
+
+L2_loop_end:
 	nop
 	add	rsp, 32
 	pop	rbx
