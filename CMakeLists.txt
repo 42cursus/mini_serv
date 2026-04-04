@@ -23,8 +23,15 @@ set(CMAKE_C_STANDARD 11)
 set(TARGET_EXE_NAME "${PROJECT_NAME}")
 
 set(PROJECT_CFLAGS
-        -g3 -O0
+#        -O0
+        -Og
+        -g3
         -Wa,-L
+        -fno-reorder-blocks
+        -fno-tree-vectorize
+        -fno-builtin-memcpy
+        -fno-builtin-memmove
+        -fno-unroll-loops
         -fcf-protection=none
         -fno-stack-protector
         -fno-verbose-asm
@@ -33,9 +40,13 @@ set(PROJECT_CFLAGS
 
 IF(CMAKE_C_COMPILER_ID STREQUAL "GNU")
     LIST(APPEND PROJECT_CFLAGS
+            -fno-thread-jumps
+            -fno-reorder-blocks-and-partition
             -fif-conversion
             -fif-conversion2
             -mmanual-endbr
+            -mstringop-strategy=libcall
+            -mmemcpy-strategy=loop:0:align,libcall:-1:align
     )
 ENDIF()
 
@@ -63,7 +74,9 @@ add_executable(${TARGET_EXE_NAME} ${TARGET_HEADERS} ${TARGET_SOURCES})
 target_link_options(${TARGET_EXE_NAME} PRIVATE)
 target_link_options(${TARGET_EXE_NAME}
         PRIVATE
-        -O0 -g3
+#        -O0
+        -Og
+        -g3
         -fno-omit-frame-pointer
         -gdwarf-3
         -nostartfiles

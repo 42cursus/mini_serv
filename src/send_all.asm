@@ -61,8 +61,8 @@ send_all:
 L2_loop_start:
 	mov	fd, -1
 	jmp L2_loop_iter;
-L2_loop_body:
 
+L2_loop_body:
 	; register unsigned int i = NFDBITS;
 	mov	r12d, NFDBITS     ; NFDBITS = 64
 
@@ -123,6 +123,7 @@ L2_loop_body:
 	mov     rsi, msg		; const void *buf
 	mov     edi, fd			; edi = fd
 	call send wrt ..plt		; Call libc function
+
 L2_loop_iter:
 	add	fd, 1
 	mov	eax, [rel max_fd]

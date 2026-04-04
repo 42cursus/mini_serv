@@ -13,9 +13,9 @@ extern next_id
 
 SECTION .rodata			  ; Section containing initialized read-only data
 
-LC1: db `server: client %d just arrived\n`,0
-LC2: db `server: client %d just left\n`,0
-LC3: db `client %d: %s`,0
+LC2: db `server: client %d just arrived\n`,0
+LC3: db `server: client %d just left\n`,0
+LC4: db `client %d: %s`,0
 
 SECTION .bss              ; Section containing uninitialized data
 
@@ -103,7 +103,7 @@ L1_loop_start:
 	jmp	L1_loop_iter
 L1_loop_body:
 	; const char *format = "client %d: %s";
-	lea	rsi, [rel LC3]
+	lea	rsi, [rel LC4]
 
 	; char *bufSend = &buf_send[0];
 	lea	rbx, [rel buf_send]
@@ -173,7 +173,7 @@ handle_leave:
 	mov	edx, dword [r12 + 0]	; `id` is at offset 0 inside the `t_client` struct
 
 	; const char *string = "server: client %d just left\n";
-	lea	rax, [rel LC2]
+	lea	rax, [rel LC3]
 
 	mov	rsi, rax				; format string
 
@@ -310,7 +310,7 @@ try_accept:
 	lea     rdx, [rel clients]     ;
 	mov     edx, dword [rdx + rax] ; load clients[connfd].id to edx
 
-	lea	rsi, [rel LC1]			   ; "server: client %d just arrived\n"
+	lea	rsi, [rel LC2]			   ; "server: client %d just arrived\n"
 	mov	rdi, r12				   ; buf_send_ptr
 	mov	eax, 0
 	call	sprintf wrt ..plt
