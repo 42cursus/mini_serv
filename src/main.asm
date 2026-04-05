@@ -5,8 +5,8 @@ default rel
 %assign EXIT_OK			0
 %assign STDERR_FILENO	2
 %assign SIGINT			2
-%assign sys_write		1
-%assign sys_exit		60
+%assign SYS_write		1
+%assign SYS_exit		60
 %assign sizeof_fd_set	0x80 ; 128 == FD_SETSIZE / NFDBITS
 
 SECTION .rodata			; Section containing initialized data
@@ -16,6 +16,8 @@ err_arg_len: equ ($ - err_arg_msg) - 1
 
 SECTION .bss				; Section containing uninitialized data
 SECTION .text				; Section containing code
+..@text_pad:
+    nop
 
 extern write
 extern exit
@@ -34,7 +36,7 @@ extern max_fd
 extern master_fds
 extern read_fds
 
-global   main
+global main:function (main.end - main)
 
 ; int main(register int argc_r, register char *argv_r[]);
 main:
@@ -49,10 +51,11 @@ main:
 	mov	r13d, edi
 	mov	r14, rsi
 
-	; if (argc == 2) goto pass;
+	; if (argc == 2) goto .pass;
 	cmp	r13d, 2
-	je	pass
+	je	.pass
 
+.fail:
 	; write(STDERR_FILENO, "Wrong number of arguments\n", sizeof("Wrong number of arguments\n") - 1);
 	lea	rsi, [rel err_arg_msg]
 	mov	edx, err_arg_len
@@ -63,16 +66,16 @@ main:
 	mov	edi, EXIT_FAILURE
 	call	exit wrt ..plt
 
-pass:
+.pass:
 	; int sockfd = init(argv);
 	mov	rdi, r14					; rdi = argv
 	call	init
 	mov	r12d, eax					; r12d = sockfd
 
-event_loop_start:
-	jmp	event_loop_iter
+.event_loop_start:
+	jmp	.event_loop_iter
 
-event_loop_body:
+.event_loop_body:
 
 	; read_fds = master_fds;
 	mov	edx, sizeof_fd_set
@@ -90,17 +93,17 @@ event_loop_body:
 	mov	rsi, rbx
 	call	select wrt ..plt
 
-	; if (fd_num < 0) goto fd_loop_end;
+	; if (fd_num < 0) goto .fd_loop_end;
 	test	eax, eax
-	js	fd_loop_end
+	js	.fd_loop_end
 
-fd_loop_start:
+.fd_loop_start:
 
 	; int fd = -1;
 	mov	ebx, -1
-	jmp	fd_loop_iter
+	jmp	.fd_loop_iter
 
-fd_loop_body:
+.fd_loop_body:
 	; register _Bool is_set = FD_ISSET(fd, &read_fds);
 	lea	eax, [rbx + 63]
 	test	ebx, ebx
@@ -116,21 +119,22 @@ fd_loop_body:
 	test	qword [rcx + rax*8], rdx
 	setne	al
 
-	; if (!is_set) goto fd_is_not_set;
+	; if (!is_set) goto .fd_is_not_set;
 	test	al, al
-	je	fd_is_not_set
+	je	.fd_is_not_set
 
-	; if (fd != sockfd) goto fd_neq_sockfd;
+.fd_is_set:
+	; if (fd != sockfd) goto .fd_neq_sockfd;
 	cmp	r12d, ebx
-	jne	fd_neq_sockfd
+	jne	.fd_neq_sockfd
 
-do_accept:
+.do_accept:
 	; try_accept(sockfd);
 	mov	edi, r12d
 	call	try_accept wrt ..plt
-	jmp	fd_loop_iter
+	jmp	.fd_loop_iter
 
-fd_neq_sockfd:
+.fd_neq_sockfd:
 	; int bytes = recv(fd, buf_read, 8192, 0);
 	mov	ecx, 0
 	mov	edx, 8192
@@ -141,32 +145,32 @@ fd_neq_sockfd:
 
 	; if (bytes <= 0)
 	test	eax, eax
-	jg	bytes_recv_gt_zero
+	jg	.bytes_recv_gt_zero
 
-bytes_recv_lte_zero:
+.bytes_recv_lte_zero:
 	mov	esi, ebx
 	mov	edi, r12d
 	call	handle_leave wrt ..plt	; void	handle_leave(int sockfd, int fd);
-	jmp	fd_loop_iter
+	jmp	.fd_loop_iter
 
-bytes_recv_gt_zero:
+.bytes_recv_gt_zero:
 	mov	esi, ebx
 	mov	edi, r12d
 	call	handle_read wrt ..plt	; void	handle_read(int sockfd, int fd, int bytes);
 
-fd_is_not_set:
+.fd_is_not_set:
 ; while (++fd <= max_fd)
-fd_loop_iter:
+.fd_loop_iter:
 	add	ebx, 1
 	cmp	dword [rel max_fd], ebx
-	jge	fd_loop_body
+	jge	.fd_loop_body
 
-fd_loop_end:
-event_loop_iter:
+.fd_loop_end:
+.event_loop_iter:
 	cmp	dword [rel g_var], SIGINT
-	jne	event_loop_body
+	jne	.event_loop_body
 
-event_loop_end:
+.event_loop_end:
 	mov	eax, 0
 	pop	rbx
 	pop	r12
@@ -174,3 +178,4 @@ event_loop_end:
 	pop	r14
 	pop	rbp
 	ret
+.end:

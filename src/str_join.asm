@@ -17,13 +17,15 @@ LC0: db "", 0
 
 SECTION .bss              ; Section containing uninitialized data
 SECTION .text			  ; Section containing code
+..@text_pad:
+    nop
 
 extern strlen
 extern strcat
 extern malloc
 extern free
 
-global   str_join
+global   str_join:function (str_join.end - str_join)
 
 ; char	*str_join(char *buf, char *add);
 str_join:
@@ -56,11 +58,12 @@ str_join:
 	call	malloc wrt ..plt
 	mov	new_buf, rax
 
-	; if (new_buf != NULL) goto result;
+	; if (new_buf != NULL) goto .result;
 	mov	rax, new_buf
 	test	rax, rax
-	je	result
+	je	.result
 
+.new_buf_is_ok:
 	; new_buf[0] = '\0';
 	mov	byte [rax], 0
 
@@ -78,7 +81,7 @@ str_join:
 	mov	rdi, new_buf
 	call	strcat wrt ..plt
 
-result:
+.result:
 	mov	rax, new_buf
 	add	rsp, 16
 	pop	rbx
@@ -87,3 +90,4 @@ result:
 	pop	r14
 	pop	rbp
 	ret
+.end:

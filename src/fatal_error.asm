@@ -20,9 +20,15 @@ err_msg_len: equ ($ - err_msg) - 1
 
 SECTION .bss				; Section containing uninitialized data
 SECTION .text				; Section containing code
+..@text_pad:
+    nop
 
-global   fatal_error
+global   fatal_error:function (fatal_error.end - fatal_error)
+
 fatal_error:
+    push rbp
+    mov  rbp, rsp
+
 	mov rax,sys_write     ; 1 = sys_write for syscall
 	mov rdi,STDERR_FILENO ; 2 = fd for stderr; write to the terminal window
 	lea rsi,[rel err_msg] ; Put address of the message string in rsi
@@ -32,3 +38,6 @@ fatal_error:
 	mov rax,sys_exit      ; 60 = exit the program
 	mov rdi,EXIT_FAILURE  ; Return value in rdi 1
 	syscall               ; Call syscall to exit
+
+	ud2
+.end:

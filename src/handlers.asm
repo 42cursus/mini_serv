@@ -25,7 +25,13 @@ extern buf_send
 extern buf_read
 extern master_fds
 
+global   handle_leave:function (handle_leave.end - handle_leave)
+global   try_accept:function (try_accept.end - try_accept)
+global   handle_read:function (handle_read.end - handle_read)
+
 SECTION .text			  ; Section containing code
+..@text_pad:
+    nop
 
 extern sprintf
 extern accept
@@ -34,10 +40,6 @@ extern free
 extern str_join
 extern send_all
 extern extract_message
-
-global   try_accept
-global   handle_leave
-global   handle_read
 
 ; --- X86_64 SysV ABI ---
 ; https://wiki.osdev.org/System_V_ABI
@@ -95,13 +97,14 @@ handle_read:
 	call	str_join wrt ..plt
 	mov	qword [r14], rax
 
-L1_loop_start:
+.loop_start:
 	; int extractResult = extract_message(msg, &msg_to_send);
 	lea	rsi, msg_to_send_slot		; rsi = msg_to_send
 	mov	rdi, r14					; rdi = msg
 	call	extract_message wrt ..plt
-	jmp	L1_loop_iter
-L1_loop_body:
+	jmp	.loop_iter
+
+.loop_body:
 	; const char *format = "client %d: %s";
 	lea	rsi, [rel LC4]
 
@@ -133,11 +136,12 @@ L1_loop_body:
 	lea	rsi, msg_to_send_slot
 	mov	rdi, r14
 	call	extract_message wrt ..plt
-L1_loop_iter:
-	test	eax, eax
-	jne	L1_loop_body
 
-L1_loop_end:
+.loop_iter:
+	test	eax, eax
+	jne	.loop_body
+
+.loop_end:
 	add	rsp, 24
 	pop	rbx
 	pop	r12
@@ -146,6 +150,7 @@ L1_loop_end:
 	pop	r15
 	pop	rbp
 	ret
+.end:
 
 ;void	handle_leave(int sockfd, int fd);
 handle_leave:
@@ -219,12 +224,13 @@ handle_leave:
 	mov	edi, ebx
 	call	close wrt ..plt
 
-	; if (clients[fd].msg == NULL) goto clear;
+	; if (clients[fd].msg == NULL) goto .clear;
 	mov	rdi, qword [r12 + 8]	; `msg` is at offset 8 inside the `t_client` struct
 	test	rdi, rdi
-	je	clear
+	je	.clear
 	call	free wrt ..plt
-clear:
+
+.clear:
 	;clients[fd].msg = NULL;
 	movsx	rbx, ebx			; sign-extend 32-bit fd into 64-bit rbx
 	sal	rbx, 4
@@ -237,6 +243,7 @@ clear:
 	pop	r14
 	pop	rbp
 	ret
+.end:
 
 ; void	try_accept(int sockfd);
 try_accept:
@@ -270,10 +277,11 @@ try_accept:
 	call	accept wrt ..plt
 	mov	connfd, eax
 
-	; if (connfd < 0) goto do_return;
+	; if (connfd < 0) goto .LEAVE;
 	test	eax, eax
-	js	do_return
+	js	.LEAVE
 
+.success:
 	; max_fd = (connfd > max_fd) ? connfd : max_fd;
 	mov	eax, connfd ; <= actually not needed, as eax already hold the connfd
 	mov	edx, dword [rel max_fd]
@@ -321,7 +329,6 @@ try_accept:
 	mov	edi, connfd		; connfd
 	call	send_all wrt ..plt
 
-
 	; --- FD_SET(connfd, &master_fds); ---
 	; register int r asm("r8") = (connfd % NFDBITS);
 	; register int FD_ELT asm("r9") = (connfd / NFDBITS);
@@ -346,9 +353,10 @@ try_accept:
 	lea	rdx, [rel master_fds]
 	or	qword [rdx+r9*8], rax
 
-do_return:
+.LEAVE:
 	add	rsp, 32
 	pop	rbx
 	pop	r12
 	pop	rbp
 	ret
+.end:

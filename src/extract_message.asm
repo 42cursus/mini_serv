@@ -51,13 +51,17 @@ default rel
 SECTION .data			  ; Section containing initialized data
 SECTION .bss              ; Section containing uninitialized data
 SECTION .text			  ; Section containing code
+..@text_pad:
+    nop
 
 extern strcpy
 extern calloc
 extern strlen
 extern strchrnul
 
-global   extract_message
+global   extract_message:function (extract_message.end - extract_message)
+
+; int	extract_message(char **bufferPointer, char **msg)
 extract_message:
 	push	rbp
 	mov	rbp, rsp
@@ -84,6 +88,7 @@ extract_message:
 	cmp buf, NULL
 	je	.ret_0
 
+.buf_not_null:
 	; new_line = strchrnul(buf, '\n');
 	mov rdi,buf               ;
 	mov rsi,10                ; '\n'
@@ -95,6 +100,7 @@ extract_message:
     cmp   byte [rax], 0
     je    .ret_0
 
+.found_newline:
 	; src = new_line + 1;
 	mov	rax, new_line
 	add	rax, 1
@@ -115,6 +121,7 @@ extract_message:
     cmp   new_buf, NULL
     je    .ret_neg1
 
+.new_buf_is_ok:
 	; strcpy(new_buf, src);
 	mov	rsi, src
 	mov	rdi, new_buf
@@ -137,11 +144,15 @@ extract_message:
 .ret_1:
 	mov	eax, 1
 	jmp	.LEAVE
+
 .ret_0:
 	mov	eax, 0
 	jmp	.LEAVE
+
 .ret_neg1:
 	mov	eax, -1
+
 .LEAVE:
 	leave
 	ret
+.end:

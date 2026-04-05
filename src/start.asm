@@ -6,8 +6,10 @@ default rel
 extern __libc_start_main
 extern main
 
-global _start
+global _start:function (_start.end - _start)
 section .text
+..@text_pad:
+    nop
 
 _start:
     xor ebp, ebp                ; conventional outermost frame marker
@@ -37,3 +39,6 @@ _start:
     mov edi, 1
     mov eax, 60
     syscall
+
+	ud2
+.end:

@@ -213,9 +213,9 @@ int main(register int argc_r, register char *argv_r[]) {
 
 int main2(register int argc_r, register char *argv_r[]) {
 	// https://gcc.gnu.org/onlinedocs/gcc/Local-Register-Variables.html
-	register int argc asm("r13") = argc_r;
+	register int argc = argc_r;
 	MATERIALIZE_IN_REG(argc);
-	register char **argv asm("r14") = argv_r;
+	register char **argv = argv_r;
 	MATERIALIZE_IN_REG(argv);
 
 	if (argc != 2)

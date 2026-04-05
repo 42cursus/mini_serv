@@ -28,15 +28,13 @@ extern max_fd
 extern master_fds
 
 SECTION .text			  ; Section containing code
+..@text_pad:
+    nop
 
 extern strlen
 extern send
 
-
-global   send_all
-global   loop_start:hidden
-global   loop_fd:hidden
-global   loop_end:hidden
+global   send_all:function (send_all.end - send_all)
 
 ; void	send_all(int sender_fd, int sockfd, char *msg);
 send_all:
@@ -58,11 +56,11 @@ send_all:
 	call strlen wrt ..plt  ; Call libc function
 	mov	msg_len, rax
 
-L2_loop_start:
+.loop_start:
 	mov	fd, -1
-	jmp L2_loop_iter;
+	jmp .loop_iter;
 
-L2_loop_body:
+.loop_body:
 	; register unsigned int i = NFDBITS;
 	mov	r12d, NFDBITS     ; NFDBITS = 64
 
@@ -115,8 +113,9 @@ L2_loop_body:
 
 	; if (is_set)
 	test	r12b, r12b
-	je	L2_loop_iter
+	je	.loop_iter
 
+.do_send:
 	; -- send(fd, msg, msg_len, 0); --
 	mov     ecx, 0			; flags = 0
 	mov     rdx, msg_len	; size_t len
@@ -124,16 +123,17 @@ L2_loop_body:
 	mov     edi, fd			; edi = fd
 	call send wrt ..plt		; Call libc function
 
-L2_loop_iter:
+.loop_iter:
 	add	fd, 1
 	mov	eax, [rel max_fd]
 	cmp	fd, eax
-	jle	L2_loop_body
+	jle	.loop_body
 
-L2_loop_end:
+.loop_end:
 	nop
 	add	rsp, 32
 	pop	rbx
 	pop	r12
 	pop	rbp
 	ret
+.end:

@@ -56,7 +56,8 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     )
 ENDIF()
 
-set(NASM_FLAGS -f elf64 -g -F dwarf -Wall -w-reloc-rel-dword)
+#set(NASM_FLAGS -f elf64 -g -F dwarf -Wall -Wno-reloc-rel-dword)
+set(NASM_FLAGS -f elf64 -g -F dwarf -w+all -w-no-reloc-rel-dword)
 
 set(TARGET_CFLAGS ${PROJECT_CFLAGS})
 set(TARGET_ASM_FLAGS ${NASM_FLAGS})
