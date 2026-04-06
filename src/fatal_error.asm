@@ -25,6 +25,8 @@ SECTION .text				; Section containing code
 
 global   fatal_error:function (fatal_error.end - fatal_error)
 
+; __attribute__((noreturn, cold))
+; void	fatal_error(void);
 fatal_error:
     push rbp
     mov  rbp, rsp

@@ -8,6 +8,7 @@ default rel
 %assign SYS_write		1
 %assign SYS_exit		60
 %assign sizeof_fd_set	0x80 ; 128 == FD_SETSIZE / NFDBITS
+%assign NULL			0
 
 SECTION .rodata			; Section containing initialized data
 
@@ -22,6 +23,7 @@ SECTION .text				; Section containing code
 extern write
 extern exit
 extern init
+extern strtol
 extern memmove
 extern memcpy
 extern select
@@ -57,8 +59,8 @@ main:
 
 .fail:
 	; write(STDERR_FILENO, "Wrong number of arguments\n", sizeof("Wrong number of arguments\n") - 1);
-	lea	rsi, [rel err_arg_msg]
 	mov	edx, err_arg_len
+	lea	rsi, [rel err_arg_msg]
 	mov	edi, STDERR_FILENO
 	call	write wrt ..plt
 
@@ -67,9 +69,20 @@ main:
 	call	exit wrt ..plt
 
 .pass:
-	; int sockfd = init(argv);
+	; register int port_number = strtol(port_string, NULL, 10);
 	mov	rdi, r14					; rdi = argv
-	call	init
+	mov	rdi, qword [rdi + 8]		; const char *nptr = &argv[1];
+	mov	edx, 10						; int base = 10
+	mov	esi, 0						; char **endptr = NULL
+	call	strtol wrt ..plt
+
+	; register in_port_t prt = htons(port_number);
+	rol	ax, 8
+
+	; int sockfd = init();
+	movzx	esi, ax
+	mov	edi, 16777343
+	call	init wrt ..plt
 	mov	r12d, eax					; r12d = sockfd
 
 .event_loop_start:
@@ -93,9 +106,9 @@ main:
 	mov	rsi, rbx
 	call	select wrt ..plt
 
-	; if (fd_num < 0) goto .fd_loop_end;
+	; if (fd_num < 0) goto .event_loop_iter;
 	test	eax, eax
-	js	.fd_loop_end
+	js	.event_loop_iter
 
 .fd_loop_start:
 
@@ -119,9 +132,9 @@ main:
 	test	qword [rcx + rax*8], rdx
 	setne	al
 
-	; if (!is_set) goto .fd_is_not_set;
+	; if (!is_set) goto .fd_loop_iter;
 	test	al, al
-	je	.fd_is_not_set
+	je	.fd_loop_iter
 
 .fd_is_set:
 	; if (fd != sockfd) goto .fd_neq_sockfd;
@@ -158,14 +171,12 @@ main:
 	mov	edi, r12d
 	call	handle_read wrt ..plt	; void	handle_read(int sockfd, int fd, int bytes);
 
-.fd_is_not_set:
 ; while (++fd <= max_fd)
 .fd_loop_iter:
 	add	ebx, 1
 	cmp	dword [rel max_fd], ebx
 	jge	.fd_loop_body
 
-.fd_loop_end:
 .event_loop_iter:
 	cmp	dword [rel g_var], SIGINT
 	jne	.event_loop_body
