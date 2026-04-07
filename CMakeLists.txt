@@ -23,7 +23,6 @@ set(CMAKE_C_STANDARD 11)
 set(TARGET_EXE_NAME "${PROJECT_NAME}")
 
 set(PROJECT_CFLAGS
-#        -O0
         -Og
         -g3
         -Wa,-L
@@ -45,6 +44,8 @@ IF(CMAKE_C_COMPILER_ID STREQUAL "GNU")
             -fif-conversion
             -fif-conversion2
             -mmanual-endbr
+            -mno-red-zone
+            -minline-all-stringops
             -mstringop-strategy=libcall
             -mmemcpy-strategy=loop:0:align,libcall:-1:align
     )

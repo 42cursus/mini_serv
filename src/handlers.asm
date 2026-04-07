@@ -4,6 +4,11 @@ default rel
 %assign NULL	          					0  ;
 %assign AF_INET          					2  ;
 %assign NFDBITS          					64 ;
+
+; #include <signal.h>
+%assign SIGINT              2
+%assign SA_SIGINFO          4
+
 %assign sizeof_client_addr          		16 ;
 %assign sizeof_t_client		          		16 ;
 
@@ -19,6 +24,7 @@ LC4: db `client %d: %s`,0
 
 SECTION .bss              ; Section containing uninitialized data
 
+extern g_var
 extern max_fd
 extern clients
 extern buf_send
@@ -28,11 +34,18 @@ extern master_fds
 global   handle_leave:function (handle_leave.end - handle_leave)
 global   try_accept:function (try_accept.end - try_accept)
 global   handle_read:function (handle_read.end - handle_read)
+global   set_handlers:function (set_handlers.end - set_handlers)
+global   sig_handler:function (sig_handler.end - sig_handler)
 
 SECTION .text			  ; Section containing code
 ..@text_pad:
     nop
 
+extern memset
+extern sigaction
+extern sigemptyset
+extern sig_handler
+extern fatal_error
 extern sprintf
 extern accept
 extern close
@@ -51,6 +64,102 @@ extern extract_message
 ;	arg5: r8
 ;	arg6: r9
 
+; void sig_handler(int sig, siginfo_t *info, void *ctx)
+sig_handler:
+	push	rbp
+	mov	rbp, rsp
+	sub	rsp, 24
+
+	; ===== stack layout (no red zone, rsp adjustment) =====
+
+	%assign sig_off							4
+	%assign info_off						16
+	%assign ctx_off							24
+
+	%define sig								dword [rbp - sig_off]		; DWORD PTR -4[rbp]
+	%define info							qword [rbp - info_off]		; QWORD PTR -16[rbp]
+	%define ctx								qword [rbp - ctx_off]		; QWORD PTR -24[rbp]
+
+	; save arguments
+	mov	sig, edi
+	mov	info, rsi
+	mov	ctx, rdx
+
+	; if (sig != SIGINT) goto LEAVE;
+	cmp	edi, SIGINT
+	jne	.LEAVE
+
+.set_g_var:
+	mov	dword [rel g_var], SIGINT
+
+.LEAVE:
+	nop
+	pop	rbp
+	ret
+.end:
+
+; void set_handlers(void)
+set_handlers:
+	push	rbp
+	mov	rbp, rsp
+	push	r12
+	push	rbx
+	sub	rsp, 320
+
+	%assign act_off							176
+	%assign old_act_off						336
+
+	%assign sigaction__handler_off			0
+	%assign sigaction__mask_off				8
+	%assign sigaction__flags_off			136
+	%assign sigaction__restorer_off			144
+	%assign sigaction__size					152
+
+	%define act__sa_sigaction				qword[rbp - act_off + sigaction__handler_off]
+	%define act__sa_flags					dword[rbp - act_off + sigaction__flags_off]
+
+	; memset(&act, 0, sizeof(act));
+	lea	rbx, [rbp - act_off]				; rbx = &act
+	mov	edx, sigaction__size
+	mov	esi, 0
+	mov	rdi, rbx
+	call	memset wrt ..plt
+
+	; act.sa_flags	 = SA_SIGINFO;
+	mov act__sa_flags, SA_SIGINFO
+
+	; act.sa_sigaction = &sig_handler;
+	lea rax, [rel sig_handler]
+	mov act__sa_sigaction, rax
+
+	; sigemptyset(&act.sa_mask);
+	lea	rdi, [rbp - act_off + sigaction__mask_off]
+	call	sigemptyset wrt ..plt
+
+	; int sigActionResult = sigaction(SIGINT, &act, &old_act);
+	lea	r12, [rbp - old_act_off]			; r12 = &old_act
+	mov	rdx, r12
+	mov	rsi, rbx
+	mov	edi, SIGINT
+	call	sigaction wrt ..plt
+
+	; if (sigActionResult == 0)
+	test eax, eax
+	je	.success
+
+.failure:
+	mov	eax, 0
+	call	fatal_error wrt ..plt
+	ud2
+
+.success:
+	add	rsp, 320
+	pop	rbx
+	pop	r12
+	pop	rbp
+	ret
+.end:
+
 ; void handle_read(int sockfd, int fd, int bytes)
 handle_read:
 	push	rbp
@@ -62,9 +171,10 @@ handle_read:
 	push	rbx
 	sub	rsp, 24
 
-	%define msg_to_send_off			56 ;
 	%define t_client_id_off			0 ; client->id
 	%define t_client_msg_off		8 ; client->msg
+
+	%define msg_to_send_off			56 ;
 	%define msg_to_send_slot		[rbp - msg_to_send_off] ; QWORD PTR -56[rbp]
 	%define msg_to_send				qword[rbp - 56] ; QWORD PTR -56[rbp]
 
