@@ -37,9 +37,9 @@ global   handle_read:function (handle_read.end - handle_read)
 global   set_handlers:function (set_handlers.end - set_handlers)
 global   sig_handler:function (sig_handler.end - sig_handler)
 
-SECTION .text			  ; Section containing code
-..@text_pad:
+SECTION .text.pad exec nowrite align=1
     nop
+SECTION .text			  ; Section containing code
 
 extern memset
 extern sigaction
@@ -93,7 +93,7 @@ sig_handler:
 	mov	dword [rel g_var], SIGINT
 
 .LEAVE:
-	nop
+	add	rsp, 24
 	pop	rbp
 	ret
 .end:

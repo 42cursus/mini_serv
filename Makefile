@@ -47,7 +47,7 @@ eatsyscall: build/eatsyscall.o
 build/%.o: src/%.asm
 		@echo Target: $@
 		@if [ ! -d $(@D) ]; then mkdir -p $(@D); fi
-		nasm -f elf64 -g -F dwarf $< -o $@
+		$(NASM) -f elf64 -g -F dwarf $< -o $@
 		@echo
 
 ## clean

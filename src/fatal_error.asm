@@ -19,9 +19,9 @@ err_msg: db `Fatal error\n`, 0
 err_msg_len: equ ($ - err_msg) - 1
 
 SECTION .bss				; Section containing uninitialized data
-SECTION .text				; Section containing code
-..@text_pad:
+SECTION .text.pad exec nowrite align=1
     nop
+SECTION .text			  ; Section containing code
 
 global   fatal_error:function (fatal_error.end - fatal_error)
 

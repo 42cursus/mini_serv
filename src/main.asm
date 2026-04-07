@@ -16,9 +16,9 @@ err_arg_msg: db `Wrong number of arguments\n`, 0
 err_arg_len: equ ($ - err_arg_msg) - 1
 
 SECTION .bss				; Section containing uninitialized data
-SECTION .text				; Section containing code
-..@text_pad:
+SECTION .text.pad exec nowrite align=1
     nop
+SECTION .text			  ; Section containing code
 
 extern write
 extern exit

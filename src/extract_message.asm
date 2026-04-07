@@ -50,9 +50,9 @@ default rel
 
 SECTION .data			  ; Section containing initialized data
 SECTION .bss              ; Section containing uninitialized data
-SECTION .text			  ; Section containing code
-..@text_pad:
+SECTION .text.pad exec nowrite align=1
     nop
+SECTION .text			  ; Section containing code
 
 extern strcpy
 extern calloc

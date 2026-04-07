@@ -7,9 +7,9 @@ extern __libc_start_main
 extern main
 
 global _start:function (_start.end - _start)
-section .text
-..@text_pad:
+SECTION .text.pad exec nowrite align=1
     nop
+SECTION .text			  ; Section containing code
 
 _start:
     xor ebp, ebp                ; conventional outermost frame marker

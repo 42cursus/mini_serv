@@ -16,9 +16,9 @@ SECTION .rodata			  ; Section containing initialized read-only data
 LC0: db "", 0
 
 SECTION .bss              ; Section containing uninitialized data
-SECTION .text			  ; Section containing code
-..@text_pad:
+SECTION .text.pad exec nowrite align=1
     nop
+SECTION .text			  ; Section containing code
 
 extern strlen
 extern strcat

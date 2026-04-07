@@ -27,9 +27,9 @@ SECTION .bss              ; Section containing uninitialized data
 extern max_fd
 extern master_fds
 
-SECTION .text			  ; Section containing code
-..@text_pad:
+SECTION .text.pad exec nowrite align=1
     nop
+SECTION .text			  ; Section containing code
 
 extern strlen
 extern send
